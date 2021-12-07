@@ -1,139 +1,89 @@
-#include <vector>
-#include <stack>
-#include <algorithm>
 #include <iostream>
-#include <queue>
-#include <climits>
+#include <set>
+#include <vector>
+#include <algorithm>
 
-
-enum class ColorN {
-    white, grey, black
-};
-
-enum class ColorL {
-    green, blue, red, black
-};
-
-class Node;
 
 struct Link {
-    float val;
-    ColorL color;
-    Node* node1;
-    Node* node2;
+    int64_t val;
+    uint64_t node1;
+    uint64_t node2;
 
-    Link(float val, Node* node1, Node* node2) : val(val), color(ColorL::black), node1(node1), node2(node2) {}
-};
-
-class Node {
-    uint64_t number;
-    float distance;
-    ColorN color;
-    std::vector<Link*> links;
-
-public:
-    Node(uint64_t number) : number(number), color(ColorN::white) {}
-
-    void AddLink(Link* link) {
-        links.push_back(link);
-    }
-
-    void ChangeColor(ColorN colorl) {
-        color = colorl;
-    }
-
-    uint64_t GetNumber() {
-        return number;
-    }
-
-    ColorN GetColor() {
-        return color;
-    }
-
-    const std::vector<Link*>& GetLinks() {
-        return links;
-    }
-
-    float GetDistance() {
-        return distance;
-    }
-
-    void ChangeDistance(float newDist) {
-        distance = newDist;
-    }
+    Link(int64_t val, uint64_t node1, uint64_t node2) : val(val), node1(node1), node2(node2) {}
 };
 
 class Graph {
-    std::vector<Node*> nodes;
     std::vector<Link*> links;
+    std::vector<uint64_t> nodes;
     uint64_t size;
-    uint64_t maximum = 0;
+
+    uint64_t get_leader(int x)
+    {
+        return (x == nodes[x] ? x : (nodes[x] = get_leader(nodes[x])));
+    }
+
+    bool merge(uint64_t x, uint64_t y)
+    {
+        x = get_leader(x);
+        y = get_leader(y);
+        if (x == y) return false;
+        nodes[x] = y;
+        return true;
+    }
 
 public:
     Graph(uint64_t size) : size(size) {
-        for (uint64_t i = 0; i < size; ++i) {
-            nodes.push_back(new Node(i));
+        for (auto i = 0; i < size; ++i) {
+            nodes.push_back(i);
         }
     }
 
-    void AddLink(uint64_t in, uint64_t out, float val) {
-        Link* NewLink = new Link(val, nodes[in], nodes[out]);
+    void AddLink(uint64_t in, uint64_t out, uint64_t val) {
+        Link* NewLink = new Link(val, in, out);
 
-        nodes[in]->AddLink(NewLink);
         links.push_back(NewLink);
-
-        Link* NewLink2 = new Link(val, nodes[out], nodes[in]);
-
-        nodes[out]->AddLink(NewLink2);
-        links.push_back(NewLink2);
     }
 
-    float dijkstra(uint64_t number, uint64_t number2) {
+    uint64_t primFindMST() {
+        std::sort(links.begin(), links.end(), [](Link* lhs, Link* rhs) {
+                      return lhs->val < rhs->val;
+                  }
+        );
+        uint64_t sum = 0;
 
-        if (number == number2)
-            return 0;
-
-        for (auto node : nodes) {
-            node->ChangeDistance(INT_MAX);
+        for (auto& link : links) {
+            if (merge(link->node1, link->node2))
+                sum += link->val;
         }
 
-        nodes[number]->ChangeDistance(0);
-        std::priority_queue < std::pair<float, int64_t>, std::vector<std::pair<float, int64_t>>, std::greater<std::pair<float, int64_t>>> local;
-        local.push({ nodes[number]->GetDistance(), number });
-
-        while (!local.empty()) {
-            int64_t now = local.top().second;
-            float dist = local.top().first;
-            local.pop();
-
-            std::vector<Link*> neighbours = nodes[now]->GetLinks();
-
-            for (auto link : neighbours) {
-                if ((1 - dist) * link->val + dist < link->node2->GetDistance()) {
-                    link->node2->ChangeDistance((1 - dist) * link->val + dist);
-                    local.push({ (1 - dist)*link->val + dist, link->node2->GetNumber() });
-                }
-            }
-        }
-
-        return nodes[number2]->GetDistance();
+        return sum;
     }
 };
 
 int main() {
-    uint64_t n, m, s, f;
-    std::cin >> n >> m >> s >> f;
+    uint64_t n, m;
+    std::cin >> n >> m;
+    std::vector<uint64_t> values;
 
     Graph graph(n);
-
-    for (auto i = 0; i < m; ++i) {
-        uint64_t node1, node2;
-        float val;
-        std::cin >> node1 >> node2 >> val;
-
-        graph.AddLink(node1 - 1, node2 - 1, val / 100);
+    for (auto i = 0; i < n; ++i) {
+        uint64_t val;
+        std::cin >> val;
+        values.push_back(val);
     }
 
+    uint64_t first = std::min_element(values.begin(), values.end()) - values.begin();
 
-    std::cout << graph.dijkstra(s - 1, f - 1);
+    for (auto i = 0; i < m; ++i) {
+        uint64_t node1, node2, val;
+        std::cin >> node1 >> node2 >> val;
+        graph.AddLink(node1 - 1, node2 - 1, val);
+    }
+
+    for (auto i = 0; i < n; ++i) {
+        if (first != i)
+            graph.AddLink(i, first, values[first] + values[i]);
+    }
+
+    std::cout << graph.primFindMST();
 }
