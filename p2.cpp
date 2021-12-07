@@ -1,158 +1,107 @@
-#include <vector>
-#include <stack>
-#include <algorithm>
 #include <iostream>
-#include <queue>
-#include <climits>
+#include <vector>
+#include <algorithm>
 
-enum class ColorN {
-    white, gray, black
+struct segment {
+    int64_t start;
+    int64_t end;
+    int64_t sum = 0;
+    segment* left = nullptr;
+    segment* right = nullptr;
 };
 
-enum class ColorL {
-    green, blue, red, black
-};
+class Colors {
+    segment* root;
+    std::vector<int64_t> input;
 
-class Node;
-
-struct Link {
-    int64_t val;
-    ColorL color;
-    Node* node1;
-    Node* node2;
-
-    Link(int64_t val, Node* node1, Node* node2) : val(val), color(ColorL::black), node1(node1), node2(node2) {}
-};
-
-class Node {
-    uint64_t number;
-    uint64_t distance;
-    ColorN color;
-    std::vector<Link*> links;
-
-public:
-    Node(uint64_t number) : number(number), color(ColorN::white) {}
-
-    void AddLink(Link* link) {
-        links.push_back(link);
-    }
-
-    void ChangeColor(ColorN colorl) {
-        color = colorl;
-    }
-
-    uint64_t GetNumber() {
-        return number;
-    }
-
-    ColorN GetColor() {
-        return color;
-    }
-
-    const std::vector<Link*>& GetLinks() {
-        return links;
-    }
-
-    uint64_t GetDistance() {
-        return distance;
-    }
-
-    void ChangeDistance(uint64_t newDist) {
-        distance = newDist;
-    }
-};
-
-class Graph {
-    std::vector<Node*> nodes;
-    std::vector<Link*> links;
-    uint64_t size;
-    uint64_t maximum = 0;
-
-public:
-    Graph(uint64_t size) : size(size) {
-        for (uint64_t i = 0; i < size; ++i) {
-            nodes.push_back(new Node(i));
+    segment* createTree(int64_t start, int64_t end, segment* cur) {
+        if (start == end - 1) {
+            cur->sum = input[start];
+            return cur;
         }
+
+        cur->left = createTree(start, end - (end - start) / 2, new segment{ start, end - (end - start) / 2 });
+        cur->right = createTree(end - (end - start) / 2, end, new segment{ end - (end - start) / 2, end });
+
+        cur->sum = std::max(cur->left->sum, cur->right->sum);
+
+        return cur;
     }
 
-    void AddLink(uint64_t in, uint64_t out, int64_t val) {
-        Link* NewLink = new Link(val, nodes[in], nodes[out]);
-
-        nodes[in]->AddLink(NewLink);
-        maximum += val;
-        links.push_back(NewLink);
-    }
-
-    void not_dfs(Node* start, uint64_t number) {
-
-        start->ChangeColor(ColorN::gray);
-        std::vector<Node*> path;
-        path.push_back(start);
-
-        for (auto i = 0; !path.empty() and i < number; ++i) {
-            std::vector<Node*> newpath;
-            for (auto node : path) {
-                std::vector<Link*> neighbours = node->GetLinks();
-                for (auto link : neighbours) {
-                    if (link->node2->GetColor() != ColorN::gray) {
-                        newpath.push_back(link->node2);
-                        link->node2->ChangeColor(ColorN::gray);
-                    }
-                }
-            }
-
-            path = newpath;
-        }
-    }
-
-    int64_t dijkstra(uint64_t number, uint64_t number2, uint64_t k) {
-
-        not_dfs(nodes[number], k);
-
-        if (number == number2)
+    int64_t _getMin(int64_t start, int64_t end, segment* cur) {
+        if (cur->start == start and cur->end == end)
+            return cur->sum;
+        else if (cur->start >= end)
+            return 0;
+        else if (cur->end <= start)
             return 0;
 
-        nodes[number]->ChangeDistance(0);
-        std::priority_queue < std::pair<int64_t, int64_t>, std::vector<std::pair<int64_t, int64_t>>, std::greater<std::pair<int64_t, int64_t>>> local;
-        local.push({ 0, number });
-        nodes[number]->ChangeColor(ColorN::black);
-
-        while (!local.empty()) {
-            int64_t now = local.top().second;
-            int64_t dist = local.top().first;
-            local.pop();
-
-            if (now == number2) {
-                return dist;
-            }
-
-            std::vector<Link*> neighbours = nodes[now]->GetLinks();
-
-            for (auto link : neighbours) {
-                if (link->node2->GetColor() == ColorN::gray) {
-                    nodes[now]->ChangeColor(ColorN::black);
-                    local.push({ link->val + dist, link->node2->GetNumber() });
-                }
-            }
+        int64_t left = 0;
+        int64_t right = 0;
+        if (cur->left->start <= start and cur->left->end >= end) {
+            left = _getMin(start, end, cur->left);
+        }
+        else if (cur->right->start <= start and cur->right->end >= end) {
+            right = _getMin(start, end, cur->right);
+        }
+        else {
+            left = _getMin(start, cur->left->end, cur->left);
+            right = _getMin(cur->right->start, end, cur->right);
         }
 
-        return -1;
+        return std::max(left, right);
+    }
+
+    void _increase(int64_t start, int64_t end, int64_t a, int64_t b, segment* cur, int64_t delta) {
+        if (cur->start >= b) {
+            return;
+        }
+        else if (cur->end <= a) {
+            return;
+        }
+        else if (start == end - 1) {
+            cur->sum += delta;
+            return;
+        }
+
+        _increase(start, end - (end - start) / 2, a, b, cur->left, delta);
+        _increase(end - (end - start) / 2, end, a, b, cur->right, delta);
+
+        cur->sum = std::max(cur->left->sum, cur->right->sum);
+    }
+
+public:
+    Colors(std::vector<int64_t> input): input(input) {
+        root = createTree(0, input.size(), new segment{ 0, input.size() });
+    }
+
+    int64_t getMax(int64_t start, int64_t end) {
+        return _getMin(start, end, root);
+    }
+
+    void increase(int64_t start, int64_t end, int64_t delta) {
+        _increase(0, input.size(), start, end, root, delta);
     }
 };
 
 int main() {
-    uint64_t n, m, k, s, f;
-    std::cin >> n >> m >> k >> s >> f;
+    int64_t n;
+    std::cin >> n;
+    std::vector<int64_t> input(n - 1);
 
-    Graph graph(n);
+    for (auto i = 0; i < n - 1; ++i)
+        std::cin >> input[i];
 
-    for (auto i = 0; i < m; ++i) {
-        uint64_t node1, node2, val;
-        std::cin >> node1 >> node2 >> val;
+    Colors res(input);
 
-        graph.AddLink(node1 - 1, node2 - 1, val);
+    int64_t capacity, count;
+    std::cin >> capacity >> count;
+
+    for (auto i = 0; i < count; ++i) {
+        int64_t start, end, delta;
+        std::cin >> start >> end >> delta;
+
+        if (res.getMax(start, end) + delta > capacity) std::cout << i << ' ';
+        else res.increase(start, end, delta);
     }
-
-
-    std::cout << graph.dijkstra(s - 1, f - 1, k);
 }

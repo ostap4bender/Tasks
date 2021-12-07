@@ -1,98 +1,142 @@
-#include <vector>
-#include <stack>
-#include <algorithm>
 #include <iostream>
-#include <climits>
 
-class Node;
-
-struct Link {
-    double val;
-    double com;
-    Node* node1;
-    Node* node2;
-
-    Link(double val, double com, Node* node1, Node* node2) : val(val), com(com), node1(node1), node2(node2) {}
-};
-
-class Node {
-    uint64_t number;
-    std::vector<Link*> links;
-
-public:
-    Node(uint64_t number) : number(number) {}
-
-    void AddLink(Link* link) {
-        links.push_back(link);
-    }
-
-    uint64_t GetNumber() {
-        return number;
-    }
-
-    const std::vector<Link*>& GetLinks() {
-        return links;
-    }
-};
-
-class Graph {
-    std::vector<Node*> nodes;
-    std::vector<Link*> links;
+struct Node {
+    std::string value;
     uint64_t size;
+    int64_t priority;
+    Node* left;
+    Node* right;
 
-    float width(Link* link, double val) {
-        return (val - link->com) * link->val;
+    Node(const std::string& value) : value(value), priority(rand()), left(nullptr), right(nullptr), size(1){}
+
+    void resize() {
+        size = 1;
+        if (left != nullptr)
+            size += left->size;
+        if (right != nullptr)
+            size += right->size;
+    }
+};
+
+class Treap {
+    Node* root;
+
+    std::pair<Node*, Node*> split(Node* node, uint64_t position) {
+        if (node == nullptr)
+            return { nullptr, nullptr };
+
+        uint64_t l = (node->left != nullptr) ? (node->left->size) : 0;
+
+        if (l >= position) {
+            std::pair<Node*, Node*> new_trees = split(node->left, position);
+
+            node->left = new_trees.second;
+            node->resize();
+            return { new_trees.first, node };
+        }
+        else {
+            std::pair<Node*, Node*> new_trees = split(node->right, position - l - 1);
+
+            node->right = new_trees.first;
+            node->resize();
+            return { node, new_trees.second };
+        }
+    }
+
+    Node* merge(Node* node1, Node* node2) {
+        if (node2 == nullptr)
+            return node1;
+
+        if (node1 == nullptr)
+            return node2;
+
+        if (node1->priority > node2->priority) {
+            node1->right = merge(node1->right, node2);
+            node1->resize();
+            return node1;
+        }
+        else {
+            node2->left = merge(node1, node2->left);
+            node2->resize();
+            return node2;
+        }
+    }
+
+    void clear(Node* node) {
+        if (node == nullptr)
+            return;
+
+        clear(node->left);
+        clear(node->right);
+
+        delete node;
     }
 
 public:
-    Graph(uint64_t size) : size(size) {
-        for (uint64_t i = 0; i < size; ++i)
-            nodes.push_back(new Node(i));
+    Treap() : root(nullptr){}
+    ~Treap() {
+        clear(root);
+        root = nullptr;
+    };
+
+    void insert(uint64_t pos, const std::string& value) {
+        Node* cur = new Node(value);
+
+        std::pair<Node*, Node*> new_trees = split(root, pos);
+        root = merge(new_trees.first, merge(cur, new_trees.second));
     }
 
-    void AddLink(uint64_t in, uint64_t out, double val, double com) {
-        Link* NewLink = new Link(val, com, nodes[in], nodes[out]);
+    void remove(uint64_t pos1, uint64_t pos2) {
+        std::pair<Node*, Node*> new_trees1 = split(root, pos1);
+        std::pair<Node*, Node*> new_trees2 = split(new_trees1.second, pos2 - pos1 + 1);
 
-        nodes[in]->AddLink(NewLink);
-        links.push_back(NewLink);
+        delete new_trees2.first;
+
+        root = merge(new_trees1.first, new_trees2.second);
     }
 
-    bool fordbellman(uint64_t s, double val) {
-        std::vector < std::pair<double, double>> dst(size, { INT_MAX, 0 });
-        dst[s] = { 0, val };
-        int64_t x;
-        for (auto i = 0; i < size; ++i) {
-            x = -1;
-            for (auto link : links) {
-                if ((dst[link->node1->GetNumber()].first != INT_MAX) and (dst[link->node2->GetNumber()].first > dst[link->node1->GetNumber()].first +
-                                                                                                                dst[link->node1->GetNumber()].second - width(link, dst[link->node1->GetNumber()].second))) {
-                    dst[link->node2->GetNumber()].first = std::max(0.0-INT_MAX, dst[link->node1->GetNumber()].first +
-                                                                                dst[link->node1->GetNumber()].second - width(link, dst[link->node1->GetNumber()].second));
-                    dst[link->node2->GetNumber()].second = width(link, dst[link->node1->GetNumber()].second);
-                    x = link->node2->GetNumber();
-                }
+    std::string get(uint64_t pos) {
+        uint64_t ns;
+        Node* node = root;
+
+        while (true) {
+            ns = (node->left != nullptr) ? (node->left->size) : 0;
+            if (ns == pos)
+                break;
+            if (pos < ns) node = node->left;
+            else {
+                pos -= ns + 1;
+                node = node->right;
             }
         }
-
-        if (x == -1)
-            return false;
-        return true;
+        return node->value;
     }
 };
 
 int main() {
-    uint64_t n, m, s;
-    double v;
-    std::cin >> n >> m >> s >> v;
+    uint64_t n;
+    std::cin >> n;
+    Treap stringArray;
 
-    Graph graph(n);
-    for (auto i = 0; i < m; ++i) {
-        uint64_t a, b;
-        double val1, com1, val2, com2;
-        std::cin >> a >> b >> val1 >> com1 >> val2 >> com2;
-        graph.AddLink(a - 1, b - 1, val1, com1);
-        graph.AddLink(b - 1, a - 1, val2, com2);
+    for (auto i = 0; i < n; ++i) {
+        char cmd;
+        std::cin >> cmd;
+
+        if(cmd == '+') {
+            uint64_t pos;
+            std::string val;
+            std::cin >> pos >> val;
+            stringArray.insert(pos, val);
+        }
+        else if(cmd == '?') {
+            uint64_t pos;
+            std::cin >> pos;
+            std::cout << stringArray.get(pos) << '\n';
+        }
+        else {
+            uint64_t pos1, pos2;
+            std::cin >> pos1 >> pos2;
+            stringArray.remove(pos1, pos2);
+        }
     }
-
-    std::cout << (graph.fordbellman(s - 1, v) ? "YES" : "NO");
 }

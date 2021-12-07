@@ -1,71 +1,75 @@
-#include <vector>
 #include <iostream>
-#include <string>
+#include <vector>
+#include <cmath>
 
-class Graph {
-    std::vector<std::vector<uint64_t>> graph;
-    uint64_t size;
+class LCA {
+    std::vector<std::vector<uint64_t>> tree;
+    uint64_t as;
+    uint64_t timer;
+    std::vector<std::vector<uint64_t>> ancestors;
+    std::vector<uint64_t> in;
+    std::vector<uint64_t> out;
 
-    void make_matrix() {
-        for (auto i = 1; i < size; ++i) {
-            for (auto j = 0; j < i; ++j) {
+    void dfs(uint64_t cur, uint64_t parent) {
+        in[cur] = ++timer;
+        ancestors[cur][0] = parent;
 
-                if (graph[i][j]) {
-                    for (auto k = 0; k < size; ++k) {
-                        if (graph[i][k] == 1 or graph[j][k] == 1) {
-                            graph[i][k] = 1;
-                        }
-                    }
-                }
-            }
+        for (auto i = 1; i < as; ++i)
+            ancestors[cur][i] = ancestors[ancestors[cur][i - 1]][i - 1];
+
+        for (auto i = 0; i < tree[cur].size(); ++i) {
+            if (tree[cur][i] != parent)
+                dfs(tree[cur][i], cur);
         }
-        for (auto i = 0; i < size; ++i) {
-            for (auto j = i + 1; j < size; ++j) {
 
-                if (graph[i][j]) {
-                    for (auto k = 0; k < size; ++k) {
-                        if (graph[i][k] == 1 or graph[j][k] == 1) {
-                            graph[i][k] = 1;
-                        }
-                    }
-                }
-            }
-        }
+        out[cur] = timer++;
+    }
+
+    bool isA(uint64_t a, uint64_t b) {
+        return in[a] <= in[b] and out[b] <= out[a];
     }
 
 public:
-    Graph(uint64_t _size): size(_size), graph(_size, std::vector<uint64_t>(_size, 0)){}
-
-    void AddLink(uint64_t i, uint64_t j, uint64_t val) {
-        graph[i][j] = val;
+    LCA(std::vector<std::vector<uint64_t>>& input) : tree(input), as(static_cast<uint64_t>(ceil(log2(input.size())))), in(input.size()), out(input.size()), ancestors(input.size(), std::vector<uint64_t>(as + 1)), timer(0) {
+        dfs(0, 0);
     }
 
-    void output() {
-        make_matrix();
+    uint64_t near(uint64_t a, uint64_t b) {
+        if (isA(a, b))
+            return a;
+        if (isA(b, a))
+            return b;
 
-        for (auto node : graph) {
-            for (auto link : node) {
-                std::cout << link;
-            }
-            std::cout << std::endl;
-        }
+        for (int i = as; i >= 0; --i) {
+            if (!isA(ancestors[a][i], b)) a = ancestors[a][i];
+
+        return ancestors[a][0];
     }
 };
 
-
-
 int main() {
-    uint64_t n;
-    char str;
-    std::cin >> n;
-    Graph graph(n);
+    uint64_t n, m, p;
+    std::cin >> n >> m;
+    std::vector<std::vector<uint64_t>>input(n);
 
-    for (size_t i = 0; i < n; ++i) {
-        for (size_t j = 0; j < n; ++j) {
-            std::cin >> str;
-            graph.AddLink(i, j, str - '0');
-        }
+    for (auto i = 1; i < n; ++i) {
+        std::cin >> p;
+        input[p].push_back(i);
     }
 
-    graph.output();
+    LCA lca(input);
+
+    uint64_t a, b, x, y, z;
+    std::cin >> a >> b >> x >> y >> z;
+    uint64_t sum = 0;
+    uint64_t v = 0;
+
+    for (auto i = 0; i < m; ++i) {
+        v = lca.near((a + v) % n, b);
+        a = (a * x + b * y + z) % n;
+        b = (b * x + a * y + z) % n;
+        sum += v;
+    }
+
+    std::cout << sum;
 }
